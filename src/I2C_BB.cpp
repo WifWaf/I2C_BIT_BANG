@@ -31,11 +31,12 @@ void i2c_bb::begin(uint8_t sda, uint8_t scl)
   // SCL is digital, so set it
   pinMode(_scl, OUTPUT);
 
-  // place bus in initial state
-  init_state();
+  // place bus in initial logic state
+  SDA_HIGH;
+  SCL_HIGH;
 }
 
-// Being new tranmission
+// Begin new transmission
 void i2c_bb::transmission_begin(uint8_t adr)
 {
   // Copy the address to a local var
@@ -72,7 +73,6 @@ bool i2c_bb::transmission_write(uint8_t *data, uint8_t len)
 // Read byte(s) from I2C - called after begin
 bool i2c_bb::transmission_read(uint8_t *data, uint8_t len)
 {
-  
   // 'Add' the read bit (we set it to 0), and shift address left 1
   ADR7_AS_READ8(_adr);
   // Send address with read/write bit over bus
@@ -113,7 +113,7 @@ uint8_t i2c_bb::get_u8()
     // A buffer for our data
     uint8_t buff = 0x00;
 
-    // A loop for the reading each bit from SDA. the scl_tick, says we are ready are finished and ready for the next bit
+    // A loop for the reading each bit from SDA. Scl_tick signals we are finished and/or ready for the next bit
     for(uint8_t i = 0; i < 8; i++) 
     { 
         // Data comes in MSB to LSB, so we need to move it over to the left. I.e. 0x01 which is 0000 0001 becomes 1000 0000 by left shifting << 7 times
@@ -211,11 +211,4 @@ void i2c_bb::start()
   // As described by the protocol
   SDA_LOW;
   SCL_LOW;
-}
-
-// Initial logic state of the bus
-void i2c_bb::init_state()
-{
-  SDA_HIGH;
-  SCL_HIGH;
 }

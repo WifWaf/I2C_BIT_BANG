@@ -20,7 +20,9 @@ void i2c_bb::begin(uint8_t sda, uint8_t scl)
   _scl = scl;
 
   pinMode(_scl, OUTPUT);
-  init_state();
+  
+  SDA_HIGH;
+  SCL_HIGH;
 }
 
 void i2c_bb::transmission_begin(uint8_t adr)
@@ -143,10 +145,4 @@ void i2c_bb::start()
 {
   SDA_LOW;
   SCL_LOW;
-}
-
-void i2c_bb::init_state()
-{
-  SDA_HIGH;
-  SCL_HIGH;
 }
