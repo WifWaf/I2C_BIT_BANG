@@ -1,30 +1,39 @@
 #include <Arduino.h>
 #include "I2C_BB.h"
 
+// Increased the duration of the SCL high (clock)
+#define SCL_CLOCK_STRECH 10
+
+// Generic timer, slows everything down (ueful on the ESP32 - replace with vTaskDelay)
+#define DELAY_GENERIC 0
+
+// The below are just functions, but as preprocessor directives, they help tidy short repeative code
 // Note I2C SDA is open drain, this means we need to use INPUT for an SDA high logic. I.e. we can't just write digitalWrite(pin, HIGH) for the SDA.
-#define SDA_HIGH pinMode(_sda, INPUT)
-#define SDA_LOW  pinMode(_sda, OUTPUT)
+#define SDA_HIGH do { pinMode(_sda, INPUT); delayMicroseconds(DELAY_GENERIC); } while(0)
+#define SDA_LOW  do { pinMode(_sda, OUTPUT); delayMicroseconds(DELAY_GENERIC); } while(0)
 
 // SCL is straight forward, and provides the clock - it provides a signal to read/write each bit.
-#define SCL_HIGH digitalWrite(_scl, HIGH)
-#define SCL_LOW  digitalWrite(_scl, LOW)
+#define SCL_HIGH do { digitalWrite(_scl, HIGH); delayMicroseconds(DELAY_GENERIC); } while(0)
+#define SCL_LOW  do { digitalWrite(_scl, LOW); delayMicroseconds(DELAY_GENERIC); } while(0)
 
 // This simply shifts the bits one space to the left and adds the write/read bit to the 7 bit address (device address commonly used). 
 // E.g. For a read command, the address 0x01, which is 0000 0001 in binary would become 0000 0011 or 0x03.
 #define ADR7_AS_WRITE8(A) do { (A) <<= 1; (A) &= 0xfe; } while(0)
 #define ADR7_AS_READ8(A) do { (A) <<= 1; (A) |= 0x01; } while(0)
 
-// These are jut to mess around with the logic HIGH/LOW durations, they can be ignored for the most part
-#define DELAY_STRETCH_FACTOR 1                               // turns off when 0
-#define SDA_DELAY 0 * DELAY_STRETCH_FACTOR 
-#define SCL_TICK_START_DELAY 0 * DELAY_STRETCH_FACTOR 
-#define SCL_TICK_HIGH_DELAY 8 * DELAY_STRETCH_FACTOR
-#define SCL_TICK_LOW_DELAY 0 * DELAY_STRETCH_FACTOR
+// Sequences --------------------------------------------------- //
+void i2c_bb::begin(uint8_t sda, uint8_t scl)
+{
+  // set local pins references
+  _sda = sda;
+  _scl = scl;
 
-// Constructor takes the SDA and SCL pins
-i2c_bb::i2c_bb(uint8_t sda, uint8_t scl) : _sda(sda), _scl(scl) {}
+  // SCL is digital, so set it
+  pinMode(_scl, OUTPUT);
 
-// Sequences ------------- //
+  // place bus in initial state
+  init_state();
+}
 
 // Being new tranmission
 void i2c_bb::transmission_begin(uint8_t adr)
@@ -32,9 +41,6 @@ void i2c_bb::transmission_begin(uint8_t adr)
   // Copy the address to a local var
   _adr = adr;
   
-  // Put the I2C bus into the at rest state
-  init_state();
-
   // Send the start sequence
   start();
 }
@@ -44,21 +50,19 @@ bool i2c_bb::transmission_write(uint8_t *data, uint8_t len)
 {
   // Add the write bit and shift address left 1
   ADR7_AS_WRITE8(_adr);
-
   // Send address with the read/write bit over bus
   send_u8(&_adr);
-  
   // Let's check for the acknowledgement bit, was our data recieved?
   uint8_t ret = check_ack();
 
-  // If not, don't send data and check acknowledgement, otherwise, send as much as we need (NOTE - no stop command is sent when doing this)
+  // If not, don't send data and check acknowledgement, otherwise, send as much as we need (NOTE - no stop command)
   for(uint8_t i = 0; i < len; i++)
   {
     if(ret)
       break;
-
+   
     send_u8(&data[i]);
-    ret = check_ack();    
+    ret = check_ack();
   }
   
   // Return a bool representing sucess or failure
@@ -68,12 +72,11 @@ bool i2c_bb::transmission_write(uint8_t *data, uint8_t len)
 // Read byte(s) from I2C - called after begin
 bool i2c_bb::transmission_read(uint8_t *data, uint8_t len)
 {
+  
   // 'Add' the read bit (we set it to 0), and shift address left 1
   ADR7_AS_READ8(_adr);
-
   // Send address with read/write bit over bus
   send_u8(&_adr);
-
   // Let's check for the acknowledgement bit, was our data recieved?
   uint8_t ret = check_ack();
   
@@ -83,10 +86,8 @@ bool i2c_bb::transmission_read(uint8_t *data, uint8_t len)
     for(uint8_t i = 0; i < len; i++)
     {
       data[i] = get_u8();
-      
       // We often need to send an acknowledgement that we recieved the data here
-      send_ack();
-      delayMicroseconds(SDA_DELAY);
+      send_ack(); 
     }
   }
   
@@ -111,10 +112,8 @@ bool i2c_bb::request_from(uint8_t adr, uint8_t *data, uint8_t len)
 
   // Start new transmission
   transmission_begin(adr);
-
   // Read data from bus, with sucess or failure returned
   uint8_t ret =  transmission_read(data, len);
-
   // End transmission
   transmission_end();
 
@@ -122,7 +121,7 @@ bool i2c_bb::request_from(uint8_t adr, uint8_t *data, uint8_t len)
   return ret;
 }
 
-// IO -------------------- //
+// IO -------------------------------------------------------- //
 
 // Get (e.g. read) a byte over I2C
 uint8_t i2c_bb::get_u8()
@@ -136,9 +135,6 @@ uint8_t i2c_bb::get_u8()
         // Data comes in MSB to LSB, so we need to move it over to the left. I.e. 0x01 which is 0000 0001 becomes 1000 0000 by left shifting << 7 times
         // This is reduced on each loop for positioning. 
         buff |= ((digitalRead(_sda) << (7-i)));
-
-        // Add some delay, if it's used
-        delayMicroseconds(SDA_DELAY);
 
         // Done here signal, next
         scl_tick();
@@ -159,30 +155,24 @@ void i2c_bb::send_u8(uint8_t *data)
     {
       // It's a 1, so send a logic HIGH
       SDA_HIGH;
-      delayMicroseconds(SDA_DELAY);
-
       // Signal that we sent the logic
       scl_tick();
-
       // now return SDA back to LOW - made a tooth
-      SDA_LOW;
-      delayMicroseconds(SDA_DELAY);
+      SDA_LOW; 
     }
     else
     {
       // It's a 0, so just pretend we need send a 0 for completion
       SDA_LOW;
-      delayMicroseconds(SDA_DELAY);
       // Signal that we sent the logic
       scl_tick();
       //  pretend we need to return back to LOW
       SDA_LOW;
-      delayMicroseconds(SDA_DELAY);
     }
   }
 }
 
-// Protocol -------------- //
+// Protocol -------------------------------------------------- //
 // Check for the akcnowledgment bit
 bool i2c_bb::check_ack()
 {
@@ -191,17 +181,14 @@ bool i2c_bb::check_ack()
 
   // Raise SDA to logic HIGH
   SDA_HIGH;
-  delayMicroseconds(SDA_DELAY);
   // Raise SCL to logic HIGH (essenitally another scl_tick()) - we need that acknowledgment bit.
   SCL_HIGH;
-  delayMicroseconds(SCL_TICK_HIGH_DELAY);
-  
+  // Stretch high time
+  delayMicroseconds(SCL_CLOCK_STRECH);
   // What is SDA now?
-  ret = digitalRead(18);
-
+  ret = digitalRead(_sda);
   // Return SCL to normal, essentially an scl_tick complete
   SCL_LOW;
-  delayMicroseconds(SCL_TICK_LOW_DELAY);
   
   // return acknowlegement bit to signal success or failure
   return ret;
@@ -211,7 +198,7 @@ bool i2c_bb::check_ack()
 void i2c_bb::send_ack()
 {
   // Send a tick to signal acknowledgement bit is ready, while pulling SDA low (acknowledged posiition)
-  SDA_LOW; 
+  SDA_LOW;
   scl_tick();
   SDA_HIGH;
 }
@@ -221,9 +208,8 @@ void i2c_bb::scl_tick()
 {
   // Just making a tooth shape, raise SCL then lower
   SCL_HIGH;
-  delayMicroseconds(SCL_TICK_HIGH_DELAY);
+  delayMicroseconds(SCL_CLOCK_STRECH);
   SCL_LOW;
-  delayMicroseconds(SCL_TICK_LOW_DELAY);
 }
 
 // Stop sequence - we have finished sending/recieving data
@@ -231,32 +217,21 @@ void i2c_bb::stop()
 {
   // As required by the protocol
   SDA_LOW;
-  delayMicroseconds(SDA_DELAY);
   SCL_HIGH;
-  delayMicroseconds(SDA_DELAY);
   SDA_HIGH;
-  delayMicroseconds(SDA_DELAY);
 }
 
 // Start sequence - start trading bits
 void i2c_bb::start()
 {
-  // as described by the protocol
+  // As described by the protocol
   SDA_LOW;
-  delayMicroseconds(SDA_DELAY);
   SCL_LOW;
-  delayMicroseconds(SCL_TICK_START_DELAY);
-  delayMicroseconds(SCL_TICK_LOW_DELAY);
 }
 
-// Utility -------------- //
-// Set bus to restting state and acount for a fresh startup
+// Initial logic state of the bus
 void i2c_bb::init_state()
 {
-  // SCL is always an OUTPUT - it's not open drain, so set it
-  pinMode(_scl, OUTPUT);
-
-  // Place SDA / SCL in the 'ready' position
   SDA_HIGH;
   SCL_HIGH;
 }

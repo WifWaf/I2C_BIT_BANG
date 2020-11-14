@@ -6,8 +6,7 @@
 class i2c_bb
 {
     public:
-        i2c_bb(uint8_t sda = 21, uint8_t scl = 22);
-
+        void begin(uint8_t sda = 2, uint8_t scl = 3);
         void transmission_begin(uint8_t adr);
         bool transmission_write(uint8_t *data, uint8_t len);
         bool transmission_read(uint8_t *data, uint8_t len);
@@ -22,7 +21,8 @@ class i2c_bb
 
         uint8_t get_u8();
         void send_u8(uint8_t *data);
-        
+
+        void logic_level(uint8_t pin, bool level);
         void init_state();
         bool check_ack();
         void send_ack();

@@ -6,7 +6,7 @@
 #define PIN_SCL 3
 
 // Create instances of library, pass pins
-i2c_bb i2c_soft(PIN_SDA, PIN_SCL);
+i2c_bb i2c_soft;
 
 // Some memory for testing
 byte data[2] = {0 ,0};
@@ -18,6 +18,7 @@ void read_attempt();
 void setup()
 {  
   Serial.begin(9600);
+  i2c_soft.begin(PIN_SDA, PIN_SCL);
 }
 
 void loop() 
@@ -31,12 +32,12 @@ void loop()
 
 void write_attempt()
 {
-  // pass address
-  i2c_soft.transmission_begin(DEV_ADR);
-
   // Dummy data
   data[0] = 20; 
   data[1] = 30;
+
+  // pass address
+  i2c_soft.transmission_begin(DEV_ADR);
 
   // Write these 2 bytes
   failure = i2c_soft.transmission_write(data, 2);
@@ -45,7 +46,7 @@ void write_attempt()
   i2c_soft.transmission_end();
 
   // Print result
- (failure) ? Serial.println("Failed to read from device") :  Serial.println("Data writen");
+  (failure) ? Serial.println("Failed to read from device") :  Serial.println("Data writen");
 }
 
 void read_attempt()
