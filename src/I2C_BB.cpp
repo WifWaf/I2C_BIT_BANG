@@ -114,13 +114,13 @@ bool i2c_bb::request_from(uint8_t adr, uint8_t *data, uint8_t len)
 {
   // This just combines the above 3 functions
 
-  // Start new tanmission
+  // Start new transmission
   transmission_begin(adr);
 
   // Read data from bus, with sucess or failure returned
   uint8_t ret =  transmission_read(data, len);
 
-  // End tranmissions
+  // End transmission
   transmission_end();
 
   // Return Sucess or failure
@@ -139,7 +139,7 @@ uint8_t i2c_bb::get_u8()
     for(uint8_t i = 0; i < 8; i++) 
     { 
         // Data comes in MSB to LSB, so we need to move it over to the left. I.e. 0x01 which is 0000 0001 becomes 1000 0000 by left shifting << 7 times
-        // This is reduced on each loop for possitioning. 
+        // This is reduced on each loop for positioning. 
         buff |= ((digitalRead(_sda) << (7-i)));
 
         // Add some delay, if it's used
@@ -197,7 +197,7 @@ bool i2c_bb::check_ack()
   // Raise SDA to logic HIGH
   SDA_HIGH;
   delayMicroseconds(SDA_DELAY);
-  // Raise SCL to logic HIGH (essenitally another scl_tick()) - we need that acnkowledgment bit.
+  // Raise SCL to logic HIGH (essenitally another scl_tick()) - we need that acknowledgment bit.
   SCL_HIGH;
   delayMicroseconds(SCL_TICK_HIGH_DELAY);
   
@@ -243,7 +243,7 @@ void i2c_bb::stop()
   delayMicroseconds(SDA_DELAY);
 }
 
-// Start sequence - we are about to start talking
+// Start sequence - start trading bits
 void i2c_bb::start()
 {
   // as described by the protocol
