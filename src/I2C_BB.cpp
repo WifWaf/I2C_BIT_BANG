@@ -105,22 +105,6 @@ void i2c_bb::transmission_end()
   stop(); 
 }
 
-// Request data sequence 
-bool i2c_bb::request_from(uint8_t adr, uint8_t *data, uint8_t len)
-{
-  // This just combines the above 3 functions
-
-  // Start new transmission
-  transmission_begin(adr);
-  // Read data from bus, with sucess or failure returned
-  uint8_t ret =  transmission_read(data, len);
-  // End transmission
-  transmission_end();
-
-  // Return Sucess or failure
-  return ret;
-}
-
 // IO -------------------------------------------------------- //
 
 // Get (e.g. read) a byte over I2C
