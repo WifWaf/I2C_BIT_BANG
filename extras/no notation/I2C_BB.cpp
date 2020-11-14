@@ -29,7 +29,6 @@ void i2c_bb::transmission_begin(uint8_t adr)
   start();
 }
 
-// Write byte(s) to I2C - called after begin
 bool i2c_bb::transmission_write(uint8_t *data, uint8_t len)
 {
   ADR7_AS_WRITE8(_adr);
