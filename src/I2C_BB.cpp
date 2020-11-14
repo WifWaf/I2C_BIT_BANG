@@ -9,11 +9,6 @@
 #define SCL_HIGH digitalWrite(_scl, HIGH)
 #define SCL_LOW  digitalWrite(_scl, LOW)
 
-// This just a function as preprocessor directive - it's short and repetative, so fits nicely here - you could also use an inline function
-#define SCL_TICK  do{ SCL_HIGH; SCL_LOW; } while(0)
-#define I2C_STOP  do{ SDA_LOW; SCL_HIGH; SDA_HIGH; } while(0)
-#define I2C_START do{ SDA_LOW; SCL_LOW; } while(0)
-
 // This simply shifts the bits one space to the left and adds the write/read bit to the 7 bit address (device address commonly used). 
 // E.g. For a read command, the address 0x01, which is 0000 0001 in binary would become 0000 0011 or 0x03.
 #define ADR7_AS_WRITE8(A) do { (A) <<= 1; (A) &= 0xfe; } while(0)
